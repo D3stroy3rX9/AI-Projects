@@ -1,0 +1,672 @@
+openapi: 3.1.0
+info:
+  title: Sentiment Analysis API
+  version: 1.0.0
+  description: |
+    Production-grade sentiment analysis API using classical machine learning.
+    Provides real-time sentiment classification, batch processing, analytics, and model management.
+  contact:
+    name: API Support
+    email: support@sentiment-api.example.com
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://api.sentiment-analysis.com
+    description: Production server
+
+tags:
+  - name: analysis
+    description: Sentiment analysis endpoints
+  - name: analytics
+    description: Analytics and reporting
+  - name: models
+    description: Model management
+  - name: webhooks
+    description: Webhook integrations
+
+paths:
+  /analyze:
+    post:
+      tags:
+        - analysis
+      summary: Analyze sentiment of single text
+      description: |
+        Analyzes the sentiment of a single piece of text and returns:
+        - Sentiment scores (positive, neutral, negative)
+        - Emotion scores (joy, anger, sadness, surprise, fear, love)
+        - Explanation with top influential words
+        - Confidence score
+      operationId: analyzeSentiment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeRequest'
+            examples:
+              positive:
+                summary: Positive sentiment example
+                value:
+                  text: "This movie was absolutely fantastic! I loved every minute of it."
+              negative:
+                summary: Negative sentiment example
+                value:
+                  text: "Terrible experience. Would not recommend to anyone."
+              neutral:
+                summary: Neutral sentiment example
+                value:
+                  text: "The product arrived on time as expected."
+      responses:
+        '200':
+          description: Successful analysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SentimentResult'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /analyze/batch:
+    post:
+      tags:
+        - analysis
+      summary: Analyze sentiment of multiple texts
+      description: Batch analyze multiple texts in a single request
+      operationId: analyzeBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchAnalyzeRequest'
+      responses:
+        '200':
+          description: Successful batch analysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchAnalyzeResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /analytics/trends:
+    get:
+      tags:
+        - analytics
+      summary: Get sentiment trends over time
+      description: Returns time-series data of sentiment trends
+      operationId: getTrends
+      parameters:
+        - name: start_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Start date for trends (ISO 8601)
+        - name: end_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: End date for trends (ISO 8601)
+        - name: interval
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [hour, day, week, month]
+            default: day
+          description: Time interval for aggregation
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+          description: Maximum number of data points
+      responses:
+        '200':
+          description: Successful retrieval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrendsResponse'
+
+  /analytics/summary:
+    get:
+      tags:
+        - analytics
+      summary: Get aggregate sentiment statistics
+      description: Returns overall sentiment distribution and statistics
+      operationId: getSummary
+      parameters:
+        - name: start_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: end_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Successful retrieval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsSummary'
+
+  /models/train:
+    post:
+      tags:
+        - models
+      summary: Train a new sentiment model
+      description: Upload labeled training data and trigger model training job
+      operationId: trainModel
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV file with 'text' and 'label' columns
+                name:
+                  type: string
+                  description: Model name
+              required:
+                - file
+      responses:
+        '202':
+          description: Training job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingJobResponse'
+        '400':
+          description: Invalid file or format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /models:
+    get:
+      tags:
+        - models
+      summary: List available models
+      description: Get list of all trained models with their metrics
+      operationId: listModels
+      responses:
+        '200':
+          description: Successful retrieval
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ModelInfo'
+
+  /models/{id}/evaluate:
+    get:
+      tags:
+        - models
+      summary: Get model evaluation metrics
+      description: Returns confusion matrix, F1 scores, and feature importance
+      operationId: evaluateModel
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Model ID
+      responses:
+        '200':
+          description: Successful retrieval
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelEvaluation'
+        '404':
+          description: Model not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /webhooks/{source}:
+    post:
+      tags:
+        - webhooks
+      summary: Receive text from external sources
+      description: Webhook endpoint for integrations (Slack, Discord, etc.)
+      operationId: webhookReceive
+      parameters:
+        - name: source
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [slack, discord, twitter, custom]
+          description: Source of the webhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Successfully processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResponse'
+
+components:
+  schemas:
+    AnalyzeRequest:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          description: Text to analyze
+          example: "This product exceeded my expectations!"
+
+    SentimentScores:
+      type: object
+      properties:
+        positive:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Positive sentiment score
+        neutral:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Neutral sentiment score
+        negative:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Negative sentiment score
+      required:
+        - positive
+        - neutral
+        - negative
+
+    EmotionScores:
+      type: object
+      properties:
+        joy:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        anger:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        sadness:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        surprise:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        fear:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        love:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+
+    TopWord:
+      type: object
+      properties:
+        word:
+          type: string
+          description: Influential word
+        weight:
+          type: number
+          format: float
+          description: Feature weight (positive or negative)
+      required:
+        - word
+        - weight
+
+    Explanation:
+      type: object
+      properties:
+        top_words:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopWord'
+          description: Top influential words
+      required:
+        - top_words
+
+    SentimentResult:
+      type: object
+      properties:
+        text:
+          type: string
+          description: Original text analyzed
+        sentiment:
+          $ref: '#/components/schemas/SentimentScores'
+        emotion:
+          $ref: '#/components/schemas/EmotionScores'
+        explanation:
+          $ref: '#/components/schemas/Explanation'
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Prediction confidence
+        predicted_label:
+          type: string
+          enum: [positive, neutral, negative]
+          description: Primary sentiment label
+      required:
+        - text
+        - sentiment
+        - confidence
+        - predicted_label
+
+    BatchAnalyzeRequest:
+      type: object
+      required:
+        - texts
+      properties:
+        texts:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 1000
+          description: Array of texts to analyze
+
+    BatchAnalyzeResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SentimentResult'
+        total:
+          type: integer
+          description: Total number of texts analyzed
+      required:
+        - results
+        - total
+
+    TrendPoint:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp for this data point
+        avg_sentiment:
+          type: number
+          format: float
+          description: Average sentiment score (-1 to 1)
+        count:
+          type: integer
+          description: Number of analyses in this interval
+        distribution:
+          type: object
+          properties:
+            positive:
+              type: integer
+            neutral:
+              type: integer
+            negative:
+              type: integer
+          required:
+            - positive
+            - neutral
+            - negative
+      required:
+        - timestamp
+        - avg_sentiment
+        - count
+        - distribution
+
+    TrendsResponse:
+      type: object
+      properties:
+        trends:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrendPoint'
+        interval:
+          type: string
+          enum: [hour, day, week, month]
+      required:
+        - trends
+        - interval
+
+    AnalyticsSummary:
+      type: object
+      properties:
+        total_analyzed:
+          type: integer
+          description: Total number of texts analyzed
+        avg_sentiment:
+          type: number
+          format: float
+          description: Average sentiment score
+        distribution:
+          type: object
+          properties:
+            positive:
+              type: integer
+            neutral:
+              type: integer
+            negative:
+              type: integer
+          required:
+            - positive
+            - neutral
+            - negative
+        top_positive_words:
+          type: array
+          items:
+            type: string
+          description: Most common positive words
+        top_negative_words:
+          type: array
+          items:
+            type: string
+          description: Most common negative words
+      required:
+        - total_analyzed
+        - avg_sentiment
+        - distribution
+
+    TrainingJobResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          description: Training job ID
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        message:
+          type: string
+      required:
+        - job_id
+        - status
+
+    ModelInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        version:
+          type: string
+        algorithm:
+          type: string
+          description: ML algorithm used
+        f1_score:
+          type: number
+          format: float
+          description: Model F1 score
+        training_samples:
+          type: integer
+          description: Number of samples used for training
+        vocabulary_size:
+          type: integer
+          description: Size of vocabulary
+        created_at:
+          type: string
+          format: date-time
+        is_active:
+          type: boolean
+          description: Whether this model is currently active
+      required:
+        - id
+        - name
+        - f1_score
+        - created_at
+        - is_active
+
+    ModelEvaluation:
+      type: object
+      properties:
+        model_id:
+          type: integer
+        confusion_matrix:
+          type: array
+          items:
+            type: array
+            items:
+              type: integer
+          description: Confusion matrix (3x3 for pos/neu/neg)
+        f1_scores:
+          type: object
+          properties:
+            positive:
+              type: number
+              format: float
+            neutral:
+              type: number
+              format: float
+            negative:
+              type: number
+              format: float
+            overall:
+              type: number
+              format: float
+          required:
+            - positive
+            - neutral
+            - negative
+            - overall
+        feature_importance:
+          type: object
+          properties:
+            positive:
+              type: array
+              items:
+                $ref: '#/components/schemas/TopWord'
+            negative:
+              type: array
+              items:
+                $ref: '#/components/schemas/TopWord'
+          required:
+            - positive
+            - negative
+      required:
+        - model_id
+        - confusion_matrix
+        - f1_scores
+        - feature_importance
+
+    WebhookResponse:
+      type: object
+      properties:
+        received:
+          type: boolean
+        sentiment_result:
+          $ref: '#/components/schemas/SentimentResult'
+      required:
+        - received
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        detail:
+          type: string
+          description: Detailed error information
+      required:
+        - error
+
+    ValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+                items:
+                  type: string
+              msg:
+                type: string
+              type:
+                type: string
