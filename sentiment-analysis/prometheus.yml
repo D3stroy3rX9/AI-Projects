@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'sentiment-api'
+    static_configs:
+      - targets: ['host.docker.internal:8000']  # Use 'api:8000' if running in docker-compose
+    metrics_path: '/metrics'

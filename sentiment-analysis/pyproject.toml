@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "sentiment-analysis-dashboard"
+version = "1.0.0"
+description = "Production-grade sentiment analysis system with classical ML"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = []
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.0.0"
+flake8 = "^7.0.0"
+mypy = "^1.8.0"
+pytest = "^8.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
