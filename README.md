@@ -2,6 +2,8 @@
 
 Three production-grade AI systems demonstrating modern ML engineering practices, each with 8 concrete prompts for Claude Code pairing.
 
+> 💡 **Want free alternatives?** Check out [5 Free-Tier AI Projects](./FREE_TIER_AI_PROJECTS.md) that use open-source models and no paid API keys ($0/month instead of $20-50/month).
+
 ## Projects Overview
 
 ### 1. Legal Document Intelligence Platform
