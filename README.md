@@ -12,6 +12,7 @@ Three production-grade AI systems demonstrating modern ML engineering practices,
 **Performance**: p95 query <3s, <$0.10 per document
 
 📄 [Full spec + prompts](./PROJECT_1_LEGAL_DOC_INTELLIGENCE.md)
+🛠️ [Build & deployment guide](./PROJECT_1_BUILD_GUIDE.md)
 
 ---
 
@@ -23,6 +24,7 @@ Three production-grade AI systems demonstrating modern ML engineering practices,
 **Performance**: p95 classification <500ms, 1000 tickets/hour throughput
 
 📄 [Full spec + prompts](./PROJECT_2_SUPPORT_TRIAGE_SYSTEM.md)
+🛠️ [Build & deployment guide](./PROJECT_2_BUILD_GUIDE.md) ⭐ **Start here**
 
 ---
 
@@ -34,6 +36,7 @@ Three production-grade AI systems demonstrating modern ML engineering practices,
 **Performance**: p95 <10s for <200 LOC, <5min for <1000 LOC, <$0.50 per review
 
 📄 [Full spec + prompts](./PROJECT_3_CODE_REVIEW_ASSISTANT.md)
+🛠️ [Build & deployment guide](./PROJECT_3_BUILD_GUIDE.md)
 
 ---
 
@@ -63,11 +66,22 @@ Three production-grade AI systems demonstrating modern ML engineering practices,
 
 ## How to Use
 
-Each project includes:
-1. **Architecture overview** (500-700 words)
-2. **Key engineering concerns** (specific solutions to hard problems)
-3. **AI system details** (model selection, prompt strategies, eval metrics)
-4. **8 Claude Code prompts** (copy-paste ready):
+Each project includes **2 documents**:
+
+### 1. Project Spec (PROJECT_X_*.md)
+- Architecture overview (500-700 words)
+- Key engineering concerns (specific solutions to hard problems)
+- AI system details (model selection, prompt strategies, eval metrics)
+- 8 Claude Code prompts (copy-paste ready)
+
+### 2. Build Guide (PROJECT_X_BUILD_GUIDE.md) ⭐
+- **Validation checklists** after each prompt (how to verify it worked)
+- **Troubleshooting** for common issues
+- **Health checks** to ensure everything is working
+- **Deployment instructions** (Railway, Vercel, Docker VPS)
+- **Production smoke tests** to verify live deployment
+
+### The 8 Prompts:
    - a) Scaffold monorepo
    - b) Write contracts (OpenAPI + GraphQL)
    - c) Design database + migrations
