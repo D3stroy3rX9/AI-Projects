@@ -80,7 +80,7 @@ def upgrade() -> None:
         sa.Column('confidence', sa.Float(), nullable=False),
         sa.Column('analyzed_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.Column('source', source_enum, nullable=False),
-        sa.Column('metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column('extra_metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.CheckConstraint('confidence >= 0 AND confidence <= 1', name='confidence_range'),
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('text_hash')

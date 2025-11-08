@@ -66,7 +66,7 @@ class Analysis(Base):
         default=SourceEnum.API,
         index=True
     )
-    metadata = Column(JSONB)  # Additional metadata
+    extra_metadata = Column(JSONB)  # Additional metadata
 
     __table_args__ = (
         Index('ix_analysis_label_time', 'predicted_label', 'analyzed_at'),
