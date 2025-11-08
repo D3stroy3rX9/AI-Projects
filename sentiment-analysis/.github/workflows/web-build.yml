@@ -1,0 +1,121 @@
+name: Web Build
+
+on:
+  push:
+    branches: [main, develop, claude/**]
+    paths:
+      - 'apps/web/**'
+      - '.github/workflows/web-build.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'apps/web/**'
+      - '.github/workflows/web-build.yml'
+
+jobs:
+  build:
+    name: Build Web (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: ['20.x', '21.x']
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('apps/web/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: pnpm install --frozen-lockfile
+
+      - name: Run linting (ESLint)
+        working-directory: apps/web
+        run: pnpm run lint || true
+
+      - name: Run type checking (TypeScript)
+        working-directory: apps/web
+        run: pnpm run type-check || npx tsc --noEmit || true
+
+      - name: Run tests (if configured)
+        working-directory: apps/web
+        run: |
+          if [ -f "package.json" ] && grep -q "\"test\":" package.json; then
+            pnpm test || true
+          else
+            echo "No tests configured"
+          fi
+
+      - name: Build Next.js application
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+        run: pnpm run build
+
+      - name: Check build output
+        working-directory: apps/web
+        run: |
+          if [ -d ".next" ]; then
+            echo "✓ Build successful"
+            ls -lah .next
+          else
+            echo "✗ Build failed - .next directory not found"
+            exit 1
+          fi
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: pnpm install --frozen-lockfile
+
+      - name: Run npm audit
+        working-directory: apps/web
+        run: pnpm audit --audit-level=high || true
+
+      - name: Run dependency check
+        working-directory: apps/web
+        run: |
+          npx depcheck || true

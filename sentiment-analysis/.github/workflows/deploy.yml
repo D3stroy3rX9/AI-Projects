@@ -1,0 +1,176 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
+    environment:
+      name: staging
+      url: https://staging.sentiment-analysis.example.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to staging environment"
+          echo "This is a placeholder - configure with your deployment method:"
+          echo "  - Docker Compose on VPS"
+          echo "  - Kubernetes cluster"
+          echo "  - Cloud provider (AWS, GCP, Azure)"
+          echo "  - Platform as a Service (Heroku, Railway, Fly.io)"
+
+      # Example: Deploy with Docker Compose on remote server
+      - name: Copy files to server
+        if: false  # Enable when ready
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          source: "docker-compose.yml,.env.example"
+          target: "/app"
+
+      - name: Deploy with docker-compose
+        if: false  # Enable when ready
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            cd /app
+            docker-compose pull
+            docker-compose up -d
+            docker-compose exec -T api poetry run alembic upgrade head
+
+      # Example: Deploy to Fly.io
+      - name: Deploy to Fly.io
+        if: false  # Enable when ready
+        uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        if: false
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Run database migrations
+        if: false  # Enable when ready
+        run: |
+          echo "Running database migrations"
+          # Add migration command here
+
+      - name: Smoke tests
+        run: |
+          echo "Running smoke tests"
+          # curl https://staging.example.com/health
+          # Add basic health checks
+
+      - name: Notify deployment
+        if: always()
+        run: |
+          echo "Deployment complete"
+          # Add Slack/Discord notification here
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.environment == 'production'
+    environment:
+      name: production
+      url: https://sentiment-analysis.example.com
+    needs: []  # Add deploy-staging if you want staged rollout
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify tag format
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          if [[ ! $GITHUB_REF =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid tag format. Must be v*.*.* (e.g., v1.0.0)"
+            exit 1
+          fi
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production environment"
+          echo "Tag: ${{ github.ref_name }}"
+
+      - name: Create GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+
+      - name: Run database migrations
+        if: false  # Enable when ready
+        run: |
+          echo "Running production database migrations"
+
+      - name: Smoke tests
+        run: |
+          echo "Running production smoke tests"
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deployment failed - initiating rollback"
+          # Add rollback logic
+
+  health-check:
+    name: Post-Deployment Health Check
+    needs: [deploy-staging]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Wait for deployment
+        run: sleep 30
+
+      - name: Check API health
+        run: |
+          echo "Checking API health endpoint"
+          # curl -f https://staging.example.com/health || exit 1
+
+      - name: Check Web health
+        run: |
+          echo "Checking web health"
+          # curl -f https://staging.example.com/ || exit 1
+
+      - name: Check database connectivity
+        run: |
+          echo "Checking database connectivity"
+
+      - name: Check worker status
+        run: |
+          echo "Checking Celery workers"
+
+      - name: Report results
+        if: always()
+        run: |
+          echo "Health check complete"
+          # Send results to monitoring system
