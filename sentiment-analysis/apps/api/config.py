@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = "json"  # json or text
 
     class Config:
-        env_file = ".env"
+        env_file = "../../.env"
         case_sensitive = True
 
 
