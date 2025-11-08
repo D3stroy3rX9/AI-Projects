@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
 
     # ML Model
-    MODEL_PATH: str = "models/latest-model.joblib"
+    MODEL_PATH: str = "models/sentiment_model.joblib"
 
     # Instrumentation
     ENABLE_TRACING: bool = True
