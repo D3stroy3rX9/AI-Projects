@@ -20,7 +20,7 @@ import hashlib
 from config import settings
 from models.sentiment import AnalyzeRequest, SentimentResult, SentimentScores, SentimentLabel
 from db.database import SessionLocal
-from db.models import Analysis, SentimentLabelEnum, SourceEnum
+from db.models import Analysis, SentimentLabelEnum, SourceEnum, Model
 
 # Configure logging
 logging.basicConfig(
@@ -149,6 +149,51 @@ async def analyze_sentiment(request: AnalyzeRequest):
     except Exception as e:
         logger.error(f"Analysis failed: {e}")
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+
+@app.get("/stats")
+async def get_stats():
+    """Get analytics stats for dashboard"""
+    db = SessionLocal()
+    try:
+        # Total analyzed count
+        total_count = db.query(Analysis).count()
+
+        # Calculate average sentiment
+        # Get all sentiment scores and compute average
+        all_analyses = db.query(Analysis).all()
+
+        avg_sentiment = 0.0
+        if all_analyses:
+            sentiment_sum = 0.0
+            for analysis in all_analyses:
+                scores = analysis.sentiment_scores
+                # Calculate weighted sentiment: positive=1, neutral=0, negative=-1
+                weighted = (scores.get('positive', 0) * 1.0 +
+                          scores.get('neutral', 0) * 0.0 +
+                          scores.get('negative', 0) * -1.0)
+                sentiment_sum += weighted
+            avg_sentiment = sentiment_sum / len(all_analyses)
+
+        # Get active model's F1 score
+        active_model = db.query(Model).filter(Model.is_active == True).first()
+        model_f1 = active_model.f1_score if active_model else 0.0
+
+        return {
+            "total_analyzed": total_count,
+            "avg_sentiment": round(avg_sentiment, 3),
+            "model_f1_score": round(model_f1, 3)
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get stats: {e}")
+        return {
+            "total_analyzed": 0,
+            "avg_sentiment": 0.0,
+            "model_f1_score": 0.0
+        }
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":

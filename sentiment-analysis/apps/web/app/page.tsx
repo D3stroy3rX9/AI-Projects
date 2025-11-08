@@ -1,14 +1,36 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api-client';
 import type { SentimentResult } from '@/types/api';
+
+interface Stats {
+  total_analyzed: number;
+  avg_sentiment: number;
+  model_f1_score: number;
+}
 
 export default function Home() {
   const [text, setText] = useState('');
   const [result, setResult] = useState<SentimentResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
+
+  // Fetch stats on mount and after each analysis
+  const fetchStats = async () => {
+    try {
+      const response = await fetch('/api/stats');
+      const data = await response.json();
+      setStats(data);
+    } catch (err) {
+      console.error('Failed to fetch stats:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
 
   const analyzeSentiment = async () => {
     if (!text.trim()) return;
@@ -19,6 +41,8 @@ export default function Home() {
     try {
       const data = await apiClient.analyze({ text });
       setResult(data);
+      // Refresh stats after analysis
+      fetchStats();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to analyze sentiment');
       console.error('Error analyzing sentiment:', err);
@@ -180,22 +204,44 @@ export default function Home() {
         </div>
       )}
 
-      {/* Quick Stats Placeholder */}
+      {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white shadow rounded-lg p-6">
           <div className="text-sm text-gray-600 mb-1">Total Analyzed</div>
-          <div className="text-3xl font-bold text-gray-900">-</div>
-          <div className="text-xs text-gray-500 mt-1">Coming in prompt (c)</div>
+          <div className="text-3xl font-bold text-gray-900">
+            {stats ? stats.total_analyzed.toLocaleString() : '-'}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">All time</div>
         </div>
         <div className="bg-white shadow rounded-lg p-6">
           <div className="text-sm text-gray-600 mb-1">Avg Sentiment</div>
-          <div className="text-3xl font-bold text-gray-900">-</div>
-          <div className="text-xs text-gray-500 mt-1">Coming in prompt (c)</div>
+          <div className={`text-3xl font-bold ${
+            stats && stats.avg_sentiment > 0.1 ? 'text-green-600' :
+            stats && stats.avg_sentiment < -0.1 ? 'text-red-600' :
+            'text-gray-600'
+          }`}>
+            {stats ? stats.avg_sentiment.toFixed(2) : '-'}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            {stats && stats.avg_sentiment > 0 ? 'Positive overall' :
+             stats && stats.avg_sentiment < 0 ? 'Negative overall' :
+             'Neutral overall'}
+          </div>
         </div>
         <div className="bg-white shadow rounded-lg p-6">
           <div className="text-sm text-gray-600 mb-1">Model F1 Score</div>
-          <div className="text-3xl font-bold text-gray-900">-</div>
-          <div className="text-xs text-gray-500 mt-1">Coming in prompt (f)</div>
+          <div className={`text-3xl font-bold ${
+            stats && stats.model_f1_score > 0.7 ? 'text-green-600' :
+            stats && stats.model_f1_score > 0.5 ? 'text-yellow-600' :
+            'text-red-600'
+          }`}>
+            {stats ? (stats.model_f1_score * 100).toFixed(1) + '%' : '-'}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            {stats && stats.model_f1_score > 0.7 ? 'Good accuracy' :
+             stats && stats.model_f1_score > 0.5 ? 'Fair accuracy' :
+             'Needs improvement'}
+          </div>
         </div>
       </div>
     </div>
