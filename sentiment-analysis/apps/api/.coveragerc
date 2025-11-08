@@ -1,0 +1,19 @@
+[run]
+source = .
+omit =
+    */tests/*
+    */venv/*
+    */.venv/*
+    */migrations/*
+    */alembic/*
+    */__pycache__/*
+    */site-packages/*
+    conftest.py
+
+[report]
+precision = 2
+show_missing = True
+skip_covered = False
+
+[html]
+directory = htmlcov
