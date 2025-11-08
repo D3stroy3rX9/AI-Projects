@@ -3,6 +3,7 @@ name = "sentiment-api"
 version = "1.0.0"
 description = "FastAPI backend for sentiment analysis"
 authors = ["Your Name <you@example.com>"]
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"
