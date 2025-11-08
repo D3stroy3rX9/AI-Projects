@@ -1,9 +1,13 @@
 """
 Simple script to run Alembic migrations
 """
-import subprocess
-import sys
+from alembic.config import Config
+from alembic import command
 
-# Run alembic upgrade head
-result = subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"])
-sys.exit(result.returncode)
+# Create Alembic configuration
+alembic_cfg = Config("alembic.ini")
+
+# Run the upgrade command
+print("Running database migrations...")
+command.upgrade(alembic_cfg, "head")
+print("Migrations completed successfully!")
