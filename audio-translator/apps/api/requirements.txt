@@ -1,0 +1,40 @@
+# FastAPI and server
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart
+websockets>=12.0
+
+# ML Models
+openai-whisper
+torch
+transformers
+sentencepiece
+
+# Database
+sqlalchemy>=2.0
+psycopg2-binary
+alembic
+
+# Configuration
+pydantic>=2.0
+pydantic-settings
+python-dotenv
+
+# Utilities
+aiohttp
+python-dateutil
+
+# Audio processing
+pydub
+ffmpeg-python
+
+# Optional: for caching
+redis
+
+# Optional: for better TTS
+gTTS
+
+# Testing
+pytest
+pytest-asyncio
+httpx
