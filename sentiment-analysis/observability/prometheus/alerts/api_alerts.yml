@@ -1,0 +1,162 @@
+groups:
+  - name: api_alerts
+    interval: 30s
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "High error rate detected"
+          description: "API error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      # High latency
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High API latency detected"
+          description: "P95 latency is {{ $value }}s (threshold: 1s)"
+
+      # Low prediction throughput
+      - alert: LowPredictionThroughput
+        expr: |
+          rate(sentiment_predictions_total[5m]) < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Low prediction throughput"
+          description: "Prediction rate is {{ $value }} req/s (threshold: 0.1 req/s)"
+
+      # High active requests
+      - alert: HighActiveRequests
+        expr: |
+          sum(http_active_requests) > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High number of active requests"
+          description: "Active requests: {{ $value }} (threshold: 100)"
+
+      # Low model F1 score
+      - alert: LowModelF1Score
+        expr: |
+          model_f1_score < 0.70
+        for: 1m
+        labels:
+          severity: warning
+          component: ml
+        annotations:
+          summary: "Model F1 score below threshold"
+          description: "Model {{ $labels.model_name }} F1 score is {{ $value }} (threshold: 0.70)"
+
+      # Database connection pool exhausted
+      - alert: DatabasePoolExhausted
+        expr: |
+          database_pool_overflow > 0
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database connection pool exhausted"
+          description: "Pool overflow: {{ $value }} connections"
+
+      # Celery task failures
+      - alert: HighCeleryTaskFailureRate
+        expr: |
+          rate(celery_tasks_total{status="failure"}[5m]) / rate(celery_tasks_total[5m]) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+          component: worker
+        annotations:
+          summary: "High Celery task failure rate"
+          description: "Task failure rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+
+      # Slow model training
+      - alert: SlowModelTraining
+        expr: |
+          histogram_quantile(0.95, rate(model_training_duration_seconds_bucket[1h])) > 300
+        for: 5m
+        labels:
+          severity: info
+          component: ml
+        annotations:
+          summary: "Slow model training detected"
+          description: "P95 training time is {{ $value }}s (threshold: 300s)"
+
+  - name: system_alerts
+    interval: 30s
+    rules:
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value }}% (threshold: 80%)"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value }}% (threshold: 85%)"
+
+      # Low disk space
+      - alert: LowDiskSpace
+        expr: |
+          (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 80
+        for: 5m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Disk usage is {{ $value }}% (threshold: 80%)"
+
+      # Redis down
+      - alert: RedisDown
+        expr: |
+          up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been down for more than 1 minute"
+
+      # PostgreSQL down
+      - alert: PostgreSQLDown
+        expr: |
+          up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL has been down for more than 1 minute"

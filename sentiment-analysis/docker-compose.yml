@@ -42,11 +42,13 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./observability/prometheus/alerts:/etc/prometheus/alerts
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
 
   grafana:
     image: grafana/grafana:latest

@@ -30,9 +30,21 @@ class Settings(BaseSettings):
 
     # Environment
     ENVIRONMENT: str = "development"
+    VERSION: str = "1.0.0"
 
     # ML Model
     MODEL_PATH: str = "models/latest-model.joblib"
+
+    # Instrumentation
+    ENABLE_TRACING: bool = True
+    ENABLE_METRICS: bool = True
+    JAEGER_ENDPOINT: str = "localhost:6831"
+    OTLP_ENDPOINT: str = ""  # Optional OTLP endpoint
+    PROMETHEUS_PORT: int = 9090
+
+    # Logging
+    LOG_LEVEL: str = "INFO"
+    LOG_FORMAT: str = "json"  # json or text
 
     class Config:
         env_file = ".env"

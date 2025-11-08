@@ -1,0 +1,198 @@
+{
+  "dashboard": {
+    "title": "Sentiment Analysis - ML Metrics",
+    "tags": ["sentiment-analysis", "ml", "machine-learning"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 0,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Model Training Duration",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(model_training_duration_seconds_bucket[1h]))",
+            "legendFormat": "P95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(model_training_duration_seconds_bucket[1h]))",
+            "legendFormat": "P50",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Duration"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Batch Analysis Size Distribution",
+        "type": "heatmap",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(sentiment_batch_size_bucket[5m])",
+            "legendFormat": "{{le}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Celery Task Execution Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(celery_tasks_total{status=\"success\"}[5m])",
+            "legendFormat": "{{task_name}} - Success",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(celery_tasks_total{status=\"failure\"}[5m])",
+            "legendFormat": "{{task_name}} - Failure",
+            "refId": "B"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Celery Task Duration",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(celery_task_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{task_name}} P95",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Duration"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Sentiment Distribution",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "sum(increase(sentiment_predictions_total[1h])) by (sentiment)",
+            "legendFormat": "{{sentiment}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Predictions by Source",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 16, "x": 8, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(sentiment_predictions_total[5m])",
+            "legendFormat": "{{source}}",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Current Model F1 Score",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "model_f1_score",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "decimals": 3,
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 0.70, "color": "yellow"},
+                {"value": 0.80, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Total Predictions (24h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 24},
+        "targets": [
+          {
+            "expr": "sum(increase(sentiment_predictions_total[24h]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Avg Prediction Time",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "rate(sentiment_prediction_duration_seconds_sum[5m]) / rate(sentiment_prediction_duration_seconds_count[5m])",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 4,
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 0.01, "color": "yellow"},
+                {"value": 0.1, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Database Pool Status",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 24},
+        "targets": [
+          {
+            "expr": "database_pool_size",
+            "legendFormat": "Pool Size",
+            "refId": "A"
+          },
+          {
+            "expr": "database_pool_overflow",
+            "legendFormat": "Overflow",
+            "refId": "B"
+          }
+        ]
+      }
+    ]
+  }
+}
