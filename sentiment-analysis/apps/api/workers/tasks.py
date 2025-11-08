@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict
 import joblib
 from pathlib import Path
+import sys
 
 from celery import Task
 from celery.exceptions import Reject
@@ -15,6 +16,10 @@ from celery.exceptions import Reject
 from workers.celery_app import celery_app
 from db import SessionLocal, Analysis, Model, TrainingData, AnalyticsSummary
 from db.models import SentimentLabelEnum, SourceEnum
+
+# Add ML package to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "packages"))
+from ml import ModelTrainer, SentimentPredictor
 
 logger = logging.getLogger(__name__)
 
@@ -96,22 +101,27 @@ def train_model_task(self, training_data_ids: List[int], model_name: str = None)
 
         logger.info(f"Loaded {len(texts)} training samples")
 
-        # 3. Train model (placeholder - will be implemented in prompt f)
+        # 3. Train model with real ML
         self.update_state(state="PROGRESS", meta={"stage": "training", "progress": 30})
 
-        # For now, create a mock model with realistic metrics
-        # This will be replaced with actual ML training in prompt (f)
-        import time
-        time.sleep(2)  # Simulate training
+        trainer = ModelTrainer(
+            max_features=5000,
+            ngram_range=(1, 2),
+            min_df=2,
+            max_df=0.9
+        )
+
+        logger.info("Training TF-IDF + Naive Bayes model...")
+        trained_model, vectorizer, metrics = trainer.train(
+            texts=texts,
+            labels=labels,
+            test_size=0.2,
+            random_state=42
+        )
 
         self.update_state(state="PROGRESS", meta={"stage": "evaluating", "progress": 70})
 
-        # Mock metrics (will be real in prompt f)
-        metrics = {
-            "f1": {"positive": 0.81, "neutral": 0.73, "negative": 0.79, "overall": 0.78},
-            "precision": {"positive": 0.80, "neutral": 0.75, "negative": 0.79},
-            "recall": {"positive": 0.82, "neutral": 0.72, "negative": 0.80},
-        }
+        logger.info(f"Training complete. F1 Score: {metrics.get('f1_macro', 0):.3f}")
 
         # 4. Save model to disk
         self.update_state(state="PROGRESS", meta={"stage": "saving", "progress": 85})
@@ -121,17 +131,15 @@ def train_model_task(self, training_data_ids: List[int], model_name: str = None)
         model_path = Path("models") / model_filename
         model_path.parent.mkdir(exist_ok=True)
 
-        # Mock model save (will be real model in prompt f)
-        model_data = {
-            "vectorizer": None,  # Placeholder
-            "classifier": None,  # Placeholder
-            "metadata": {
-                "trained_at": timestamp,
-                "training_samples": len(texts),
-                "data_hash": data_hash,
-            }
+        # Save real trained model
+        metadata = {
+            "trained_at": timestamp,
+            "training_samples": len(texts),
+            "data_hash": data_hash,
+            "metrics": metrics
         }
-        joblib.dump(model_data, model_path)
+        trainer.save_model(trained_model, vectorizer, str(model_path), metadata=metadata)
+        logger.info(f"Model saved to {model_path}")
 
         # 5. Update database
         self.update_state(state="PROGRESS", meta={"stage": "updating_db", "progress": 95})
@@ -144,9 +152,9 @@ def train_model_task(self, training_data_ids: List[int], model_name: str = None)
             name=model_name or f"model_{data_hash}",
             version=timestamp,
             algorithm="MultinomialNB + TF-IDF",
-            f1_score=metrics["f1"]["overall"],
-            training_samples=len(texts),
-            vocabulary_size=5000,  # Placeholder, will be real in prompt f
+            f1_score=metrics.get("f1_macro", 0.0),
+            training_samples=metrics.get("training_samples", len(texts)),
+            vocabulary_size=metrics.get("vocabulary_size", 0),
             is_active=True,
             model_path=str(model_path),
             metrics=metrics,
@@ -209,6 +217,15 @@ def batch_analyze_task(self, texts: List[str], source: str = "batch"):
 
         source_enum = SourceEnum(source) if source in [e.value for e in SourceEnum] else SourceEnum.BATCH
 
+        # Load active model
+        active_model = self.db.query(Model).filter(Model.is_active == True).first()
+        if not active_model:
+            raise Reject("No active model found. Train a model first.")
+
+        # Initialize predictor
+        predictor = SentimentPredictor(model_path=active_model.model_path)
+        logger.info(f"Loaded model: {active_model.name} (F1: {active_model.f1_score:.3f})")
+
         for i, text in enumerate(texts):
             # Update progress every 10%
             if i % max(1, len(texts) // 10) == 0:
@@ -227,53 +244,23 @@ def batch_analyze_task(self, texts: List[str], source: str = "batch"):
                 skipped_count += 1
                 continue
 
-            # Analyze sentiment (placeholder - will be implemented in prompt f)
-            # For now, generate mock predictions
-            import random
-            label = random.choice(list(SentimentLabelEnum))
+            # Analyze sentiment with real ML model
+            prediction = predictor.predict(text)
 
-            if label == SentimentLabelEnum.POSITIVE:
-                sentiment_scores = {
-                    "positive": round(random.uniform(0.70, 0.95), 4),
-                    "neutral": round(random.uniform(0.02, 0.15), 4),
-                    "negative": round(random.uniform(0.01, 0.10), 4),
-                }
-            elif label == SentimentLabelEnum.NEGATIVE:
-                sentiment_scores = {
-                    "positive": round(random.uniform(0.01, 0.10), 4),
-                    "neutral": round(random.uniform(0.02, 0.15), 4),
-                    "negative": round(random.uniform(0.70, 0.95), 4),
-                }
-            else:  # NEUTRAL
-                sentiment_scores = {
-                    "positive": round(random.uniform(0.10, 0.30), 4),
-                    "neutral": round(random.uniform(0.50, 0.80), 4),
-                    "negative": round(random.uniform(0.10, 0.30), 4),
-                }
-
-            # Normalize to sum to 1.0
-            total = sum(sentiment_scores.values())
-            sentiment_scores = {k: round(v / total, 4) for k, v in sentiment_scores.items()}
-
-            confidence = max(sentiment_scores.values())
+            sentiment_scores = prediction['sentiment_scores']
+            predicted_label = SentimentLabelEnum(prediction['predicted_label'])
+            confidence = prediction['confidence']
 
             # Create analysis record
             analysis = Analysis(
                 text_hash=text_hash,
                 text=text,
                 sentiment_scores=sentiment_scores,
-                emotion_scores={
-                    "joy": round(random.uniform(0.01, 0.30), 4),
-                    "anger": round(random.uniform(0.01, 0.30), 4),
-                    "sadness": round(random.uniform(0.01, 0.30), 4),
-                    "surprise": round(random.uniform(0.01, 0.30), 4),
-                    "fear": round(random.uniform(0.01, 0.30), 4),
-                    "love": round(random.uniform(0.01, 0.30), 4),
-                },
-                predicted_label=label,
+                emotion_scores=None,  # Emotion analysis not implemented yet
+                predicted_label=predicted_label,
                 confidence=confidence,
                 source=source_enum,
-                metadata={"batch_task_id": self.request.id},
+                metadata={"batch_task_id": self.request.id, "model_id": active_model.id},
             )
 
             self.db.add(analysis)
