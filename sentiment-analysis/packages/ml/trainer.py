@@ -62,6 +62,20 @@ class ModelTrainer:
         Returns:
             Configured TfidfVectorizer
         """
+        # Create custom stop words excluding negations
+        from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
+
+        # Remove negation-related words from stop words
+        negation_words = {
+            'not', 'no', 'nor', 'neither', 'never', 'none', 'nobody', 'nothing',
+            'nowhere', 'without', 'won', 'wouldn', 'shouldn', 'couldn', 'can',
+            'cannot', 'don', 'doesn', 'didn', 'hasn', 'haven', 'won\'t', 'can\'t',
+            'isn', 'aren', 'wasn', 'weren', 'mustn', 'needn', 'shan', 'mightn',
+            'ain', 'against'  # Keep negation context words
+        }
+
+        custom_stop_words = ENGLISH_STOP_WORDS - negation_words
+
         return TfidfVectorizer(
             max_features=self.max_features,
             ngram_range=self.ngram_range,
@@ -70,7 +84,7 @@ class ModelTrainer:
             strip_accents='unicode',
             analyzer='word',
             token_pattern=r'\w{1,}',
-            stop_words='english',
+            stop_words=list(custom_stop_words),  # Use custom stop words
             sublinear_tf=True  # Use sublinear TF scaling
         )
 

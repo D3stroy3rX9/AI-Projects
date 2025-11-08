@@ -58,12 +58,12 @@ def main():
         # Initialize trainer
         print("\n2. Initializing trainer...")
         trainer = ModelTrainer(
-            max_features=5000,
-            ngram_range=(1, 2),  # Unigrams and bigrams
+            max_features=10000,  # Increased for trigrams
+            ngram_range=(1, 3),  # Unigrams, bigrams, and trigrams for better negation handling
             min_df=2,
             max_df=0.9
         )
-        print("✓ Trainer configured")
+        print("✓ Trainer configured with trigrams for negation support")
 
         # Train model
         print("\n3. Training model...")
