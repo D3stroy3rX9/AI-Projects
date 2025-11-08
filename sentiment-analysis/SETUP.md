@@ -304,62 +304,27 @@ docker-compose logs [service-name]
 ```bash
 cd apps/api
 
-# Install dependencies with Poetry
-poetry install
+# Install dependencies with Poetry (skip installing the project itself)
+poetry install --no-root
 
 # This will:
 # - Create virtual environment
-# - Install all Python packages
+# - Install all Python packages (~123 dependencies)
 # - May take 5-10 minutes
 ```
 
-**Add ML dependencies:**
+**Note:** The `.env` file is already in the project root (`sentiment-analysis/.env`), so you don't need to create it.
+
+**Create database tables:**
 ```bash
-poetry add scikit-learn joblib numpy
-```
+# Create all database tables (replaces Alembic migrations)
+poetry run python create_tables.py
 
-**Create .env file:**
-```bash
-# Copy example env file
-cp .env.example .env
-
-# Or create manually
-cat > .env << 'EOF'
-# Database
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/sentiment
-
-# Redis
-REDIS_URL=redis://localhost:6379
-CELERY_BROKER_URL=redis://localhost:6379/0
-CELERY_RESULT_BACKEND=redis://localhost:6379/0
-
-# API
-API_HOST=0.0.0.0
-API_PORT=8000
-ENVIRONMENT=development
-VERSION=1.0.0
-
-# Instrumentation
-ENABLE_TRACING=true
-ENABLE_METRICS=true
-JAEGER_ENDPOINT=localhost:6831
-PROMETHEUS_PORT=9090
-LOG_LEVEL=INFO
-LOG_FORMAT=text
-
-# ML
-MODEL_PATH=models/sentiment_model.joblib
-EOF
-```
-
-**Run database migrations:**
-```bash
-# Create database tables
-poetry run alembic upgrade head
-
-# Verify migration
-poetry run alembic current
-# Should show: 001 (head)
+# This creates:
+# - analysis table (TimescaleDB hypertable)
+# - models table
+# - training_data table
+# - analytics_summary table
 ```
 
 **Seed the database:**
@@ -565,7 +530,6 @@ docker exec -it sentiment-analysis-postgres-1 psql -U postgres -d sentiment
 # - models
 # - training_data
 # - analytics_summary
-# - alembic_version
 
 # Count records
 SELECT COUNT(*) FROM analysis;
@@ -700,8 +664,9 @@ pip install -r requirements.txt
 docker exec -it sentiment-analysis-postgres-1 psql -U postgres -c "DROP DATABASE IF EXISTS sentiment;"
 docker exec -it sentiment-analysis-postgres-1 psql -U postgres -c "CREATE DATABASE sentiment;"
 
-# Run migrations again
-poetry run alembic upgrade head
+# Create tables again
+cd apps/api
+poetry run python create_tables.py
 ```
 
 **Check database connection:**
@@ -887,7 +852,7 @@ rm -rf apps/web/node_modules apps/web/.next
 
 # Start fresh
 docker-compose up -d
-cd apps/api && poetry install && poetry run alembic upgrade head && poetry run python seed.py
+cd apps/api && poetry install --no-root && poetry run python create_tables.py && poetry run python seed.py && poetry run python scripts/train_initial_model.py
 cd ../web && pnpm install
 ```
 
