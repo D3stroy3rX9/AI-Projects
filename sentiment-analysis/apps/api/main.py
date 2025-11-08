@@ -3,11 +3,18 @@ Sentiment Analysis API
 FastAPI application for real-time sentiment analysis with classical ML
 """
 
+import sys
+from pathlib import Path
+
+# Add packages directory to Python path for ML imports
+packages_path = Path(__file__).parent.parent.parent / "packages"
+if str(packages_path) not in sys.path:
+    sys.path.insert(0, str(packages_path))
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
-from pathlib import Path
 import hashlib
 
 from config import settings
