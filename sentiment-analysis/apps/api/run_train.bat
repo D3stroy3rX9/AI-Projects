@@ -1,11 +1,11 @@
 @echo off
 echo ========================================
-echo Creating Database Tables
+echo Training ML Model
 echo ========================================
 
-REM Activate virtual environment and run create_tables.py
+REM Activate virtual environment and run training script
 call venv\Scripts\activate.bat
-python create_tables.py
+python scripts\train_initial_model.py
 
 echo.
 pause

@@ -1,11 +1,11 @@
 @echo off
 echo ========================================
-echo Creating Database Tables
+echo Seeding Database
 echo ========================================
 
-REM Activate virtual environment and run create_tables.py
+REM Activate virtual environment and run seed.py
 call venv\Scripts\activate.bat
-python create_tables.py
+python seed.py
 
 echo.
 pause
