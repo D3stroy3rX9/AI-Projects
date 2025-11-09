@@ -13,11 +13,19 @@ from datetime import datetime
 from config import settings
 from db.database import get_db, init_db, engine
 from db.models import Translation
+from services.whisper_service import WhisperService
+from utils.audio import (
+    save_audio_chunk,
+    convert_to_wav,
+    clean_temp_files,
+    clean_old_temp_files,
+    get_audio_duration
+)
 
 
 # Global variables for model loading
 models_loaded = False
-whisper_model = None
+whisper_service: Optional[WhisperService] = None
 translation_service = None
 
 
@@ -26,7 +34,7 @@ async def lifespan(app: FastAPI):
     """
     Lifespan context manager for model loading/cleanup
     """
-    global models_loaded, whisper_model, translation_service
+    global models_loaded, whisper_service, translation_service
 
     print("🚀 Starting up Audio Auto-Translator API...")
 
@@ -37,14 +45,33 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠️  Database initialization warning: {e}")
 
-    # Model loading will be implemented in Prompt C & D
-    print("ℹ️  Model loading will be added in Prompt C (Whisper) and D (Translation)")
-    models_loaded = False
+    # Load Whisper model
+    try:
+        print(f"\n📥 Loading Whisper model: {settings.whisper_model}")
+        whisper_service = WhisperService(model_name=settings.whisper_model)
+        print("✅ Whisper model loaded successfully")
+        models_loaded = True
+    except Exception as e:
+        print(f"❌ Failed to load Whisper model: {e}")
+        print("   Run: python download_models.py --model base")
+        models_loaded = False
+
+    # Translation service will be loaded in Prompt D
+    print("ℹ️  Translation service will be added in Prompt D")
+
+    # Clean old temp files on startup
+    clean_old_temp_files(max_age_seconds=3600)
 
     yield
 
     # Cleanup on shutdown
     print("🔄 Shutting down Audio Auto-Translator API...")
+
+    # Clean all temp files
+    print("🗑️  Cleaning temporary audio files...")
+    clean_old_temp_files(max_age_seconds=0)  # Delete all temp files
+
+    # Dispose database
     engine.dispose()
     print("✅ Cleanup complete")
 
@@ -289,63 +316,105 @@ async def websocket_translate(websocket: WebSocket):
                 target_lang = message.get("target_lang", "en")
                 session_id = message.get("session_id")
 
-                # For now, send placeholder response
-                # Actual implementation will be in Prompt C & D
-                await websocket.send_json({
-                    "type": "info",
-                    "message": "Audio received. Whisper transcription will be added in Prompt C."
-                })
+                # Temporary file paths for cleanup
+                temp_files = []
 
-                # Placeholder transcription (will be replaced in Prompt C)
-                await websocket.send_json({
-                    "type": "transcription",
-                    "text": "[Transcription will appear here after Prompt C]",
-                    "language": source_lang if source_lang != "auto" else "en",
-                    "confidence": 0.0
-                })
-
-                # Placeholder translation (will be replaced in Prompt D)
-                await websocket.send_json({
-                    "type": "translation",
-                    "text": "[Translation will appear here after Prompt D]",
-                    "source": source_lang if source_lang != "auto" else "en",
-                    "target": target_lang
-                })
-
-                # Save to database (placeholder data for now)
-                # In production, this will save actual transcription and translation
                 try:
-                    # Get database session
-                    from db.database import SessionLocal
-                    db = SessionLocal()
+                    # Check if Whisper is loaded
+                    if whisper_service is None:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": "Whisper model not loaded. Run: python download_models.py --model base"
+                        })
+                        continue
 
-                    translation = Translation(
-                        source_language=source_lang if source_lang != "auto" else "en",
-                        target_language=target_lang,
-                        source_text="[Placeholder - will be transcribed in Prompt C]",
-                        translated_text="[Placeholder - will be translated in Prompt D]",
-                        audio_duration=0.0,
-                        confidence_score=0.0,
-                        session_id=session_id
-                    )
-
-                    db.add(translation)
-                    db.commit()
-                    db.refresh(translation)
-                    db.close()
-
+                    # Send processing status
                     await websocket.send_json({
-                        "type": "saved",
-                        "translation_id": str(translation.id),
-                        "message": "Translation saved to history"
+                        "type": "processing",
+                        "message": "Processing audio..."
                     })
+
+                    # Step 1: Save audio chunk
+                    audio_file = save_audio_chunk(audio_data)
+                    temp_files.append(audio_file)
+
+                    # Step 2: Convert to WAV format for Whisper
+                    wav_file = convert_to_wav(audio_file)
+                    temp_files.append(wav_file)
+
+                    # Step 3: Get audio duration
+                    duration = get_audio_duration(wav_file)
+
+                    # Step 4: Transcribe with Whisper
+                    transcribe_lang = None if source_lang == "auto" else source_lang
+                    result = await whisper_service.transcribe(wav_file, language=transcribe_lang)
+
+                    # Extract transcription data
+                    transcription_text = result["text"]
+                    detected_language = result["language"]
+                    confidence = result["confidence"]
+
+                    # Send transcription result
+                    await websocket.send_json({
+                        "type": "transcription",
+                        "text": transcription_text,
+                        "language": detected_language,
+                        "confidence": confidence,
+                        "duration": duration
+                    })
+
+                    # Placeholder translation (will be replaced in Prompt D)
+                    await websocket.send_json({
+                        "type": "translation",
+                        "text": "[Translation will be added in Prompt D]",
+                        "source": detected_language,
+                        "target": target_lang
+                    })
+
+                    # Save to database
+                    try:
+                        from db.database import SessionLocal
+                        db = SessionLocal()
+
+                        translation = Translation(
+                            source_language=detected_language,
+                            target_language=target_lang,
+                            source_text=transcription_text,
+                            translated_text="[Translation pending - Prompt D]",
+                            audio_duration=duration,
+                            confidence_score=confidence,
+                            session_id=session_id
+                        )
+
+                        db.add(translation)
+                        db.commit()
+                        db.refresh(translation)
+                        db.close()
+
+                        await websocket.send_json({
+                            "type": "saved",
+                            "translation_id": str(translation.id),
+                            "message": "Transcription saved to history"
+                        })
+
+                    except Exception as db_error:
+                        print(f"Database error: {db_error}")
+                        await websocket.send_json({
+                            "type": "warning",
+                            "message": f"Transcription successful but database error: {str(db_error)}"
+                        })
 
                 except Exception as e:
-                    print(f"Error saving to database: {e}")
+                    print(f"Error processing audio: {e}")
                     await websocket.send_json({
                         "type": "error",
-                        "message": f"Database error: {str(e)}"
+                        "message": f"Processing error: {str(e)}"
                     })
+
+                finally:
+                    # Clean up temporary files
+                    if temp_files:
+                        clean_temp_files(temp_files)
 
             elif msg_type == "ping":
                 # Respond to ping with pong
