@@ -14,6 +14,8 @@ from config import settings
 from db.database import get_db, init_db, engine
 from db.models import Translation
 from services.whisper_service import WhisperService
+from services.libretranslate_service import LibreTranslateService
+from services.translation_service import TranslationService
 from utils.audio import (
     save_audio_chunk,
     convert_to_wav,
@@ -21,12 +23,13 @@ from utils.audio import (
     clean_old_temp_files,
     get_audio_duration
 )
+from utils.language_codes import whisper_to_libretranslate
 
 
 # Global variables for model loading
 models_loaded = False
 whisper_service: Optional[WhisperService] = None
-translation_service = None
+translation_service: Optional[TranslationService] = None
 
 
 @asynccontextmanager
@@ -56,8 +59,43 @@ async def lifespan(app: FastAPI):
         print("   Run: python download_models.py --model base")
         models_loaded = False
 
-    # Translation service will be loaded in Prompt D
-    print("ℹ️  Translation service will be added in Prompt D")
+    # Load Translation service
+    try:
+        print(f"\n📥 Loading translation service: {settings.translation_backend}")
+
+        if settings.translation_backend == "libretranslate":
+            # Initialize LibreTranslate service
+            libretranslate = LibreTranslateService(api_url=settings.libretranslate_url)
+
+            # Create translation service with LibreTranslate backend
+            translation_service = TranslationService(
+                backend="libretranslate",
+                libretranslate_service=libretranslate,
+                enable_cache=True,
+                cache_size=1000
+            )
+
+            print("✅ Translation service loaded successfully")
+
+        elif settings.translation_backend == "nllb":
+            # NLLB local model (optional implementation)
+            print("⚠️  NLLB backend selected but not implemented yet")
+            print("   Using LibreTranslate as fallback")
+
+            libretranslate = LibreTranslateService(api_url=settings.libretranslate_url)
+            translation_service = TranslationService(
+                backend="libretranslate",
+                libretranslate_service=libretranslate,
+                enable_cache=True
+            )
+
+        else:
+            raise ValueError(f"Unknown translation backend: {settings.translation_backend}")
+
+    except Exception as e:
+        print(f"❌ Failed to load translation service: {e}")
+        print("   Translation will not be available")
+        translation_service = None
 
     # Clean old temp files on startup
     clean_old_temp_files(max_age_seconds=3600)
@@ -66,6 +104,10 @@ async def lifespan(app: FastAPI):
 
     # Cleanup on shutdown
     print("🔄 Shutting down Audio Auto-Translator API...")
+
+    # Close translation service
+    if translation_service:
+        await translation_service.close()
 
     # Clean all temp files
     print("🗑️  Cleaning temporary audio files...")
@@ -363,10 +405,46 @@ async def websocket_translate(websocket: WebSocket):
                         "duration": duration
                     })
 
-                    # Placeholder translation (will be replaced in Prompt D)
+                    # Step 5: Translate text
+                    translated_text = ""
+
+                    if translation_service is None:
+                        # Translation service not available
+                        await websocket.send_json({
+                            "type": "warning",
+                            "message": "Translation service not available"
+                        })
+                        translated_text = "[Translation service not available]"
+
+                    elif detected_language == target_lang:
+                        # Same language, no translation needed
+                        translated_text = transcription_text
+
+                    else:
+                        try:
+                            # Convert Whisper language code to LibreTranslate code
+                            source_code = whisper_to_libretranslate(detected_language)
+                            target_code = whisper_to_libretranslate(target_lang)
+
+                            # Translate
+                            translated_text = await translation_service.translate(
+                                text=transcription_text,
+                                source_lang=source_code,
+                                target_lang=target_code
+                            )
+
+                        except Exception as trans_error:
+                            print(f"Translation error: {trans_error}")
+                            await websocket.send_json({
+                                "type": "warning",
+                                "message": f"Translation failed: {str(trans_error)}"
+                            })
+                            translated_text = f"[Translation error: {str(trans_error)}]"
+
+                    # Send translation result
                     await websocket.send_json({
                         "type": "translation",
-                        "text": "[Translation will be added in Prompt D]",
+                        "text": translated_text,
                         "source": detected_language,
                         "target": target_lang
                     })
@@ -380,7 +458,7 @@ async def websocket_translate(websocket: WebSocket):
                             source_language=detected_language,
                             target_language=target_lang,
                             source_text=transcription_text,
-                            translated_text="[Translation pending - Prompt D]",
+                            translated_text=translated_text,
                             audio_duration=duration,
                             confidence_score=confidence,
                             session_id=session_id
@@ -394,7 +472,7 @@ async def websocket_translate(websocket: WebSocket):
                         await websocket.send_json({
                             "type": "saved",
                             "translation_id": str(translation.id),
-                            "message": "Transcription saved to history"
+                            "message": "Translation saved to history"
                         })
 
                     except Exception as db_error:
