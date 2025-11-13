@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import TTSPlayer from "./TTSPlayer";
 
 interface TranslationDisplayProps {
   transcription: string;
@@ -9,6 +10,7 @@ interface TranslationDisplayProps {
   targetLanguage: string;
   confidence: number;
   isProcessing: boolean;
+  autoPlayTTS?: boolean;
 }
 
 // Language names map
@@ -43,6 +45,7 @@ export default function TranslationDisplay({
   targetLanguage,
   confidence,
   isProcessing,
+  autoPlayTTS = false,
 }: TranslationDisplayProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -160,6 +163,17 @@ export default function TranslationDisplay({
               )}
             </div>
 
+            {/* TTS Player for transcription */}
+            {transcription && (
+              <div className="pt-2 border-t border-gray-200">
+                <TTSPlayer
+                  text={transcription}
+                  language={sourceLanguage}
+                  autoPlay={false}
+                />
+              </div>
+            )}
+
             {/* Confidence score */}
             {confidence > 0 && (
               <div className="flex items-center space-x-2">
@@ -267,6 +281,17 @@ export default function TranslationDisplay({
                 </p>
               )}
             </div>
+
+            {/* TTS Player for translation */}
+            {translation && !translation.startsWith("[") && (
+              <div className="pt-2 border-t border-blue-200">
+                <TTSPlayer
+                  text={translation}
+                  language={targetLanguage}
+                  autoPlay={autoPlayTTS}
+                />
+              </div>
+            )}
           </div>
         </div>
 
