@@ -5,8 +5,10 @@ import AudioRecorder from "@/components/AudioRecorder";
 import TranslationDisplay from "@/components/TranslationDisplay";
 import LanguageSelector from "@/components/LanguageSelector";
 import TranslationHistory from "@/components/TranslationHistory";
+import ThemeToggle from "@/components/ThemeToggle";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import Link from "next/link";
+import { MessageSquare } from "lucide-react";
 
 export default function Home() {
   // Language selection
@@ -67,26 +69,35 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <header className="text-center mb-12">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex-1"></div>
+            <div className="flex-1 flex items-center gap-3">
+              <ThemeToggle />
+            </div>
             <div className="flex-1 text-center">
-              <h1 className="text-5xl font-bold text-gray-900 mb-3">
+              <h1 className="text-5xl font-bold text-gray-900 dark:text-gray-100 mb-3">
                 🎤 Audio Auto-Translator
               </h1>
-              <p className="text-lg text-gray-600">
+              <p className="text-lg text-gray-600 dark:text-gray-400">
                 Speak in any language, get instant translation
               </p>
             </div>
-            <div className="flex-1 flex justify-end">
+            <div className="flex-1 flex justify-end items-center gap-3">
+              <Link
+                href="/conversation"
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium flex items-center gap-2"
+              >
+                <MessageSquare className="w-4 h-4" />
+                Conversation
+              </Link>
               <Link
                 href="/history"
                 className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm font-medium"
               >
-                View All History
+                History
               </Link>
             </div>
           </div>
